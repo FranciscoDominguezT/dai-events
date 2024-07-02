@@ -13,9 +13,9 @@ export default class EventListService {
         return returnArray;
     }
 
-    getParticipantsAsync = async (id) => {
+    getParticipantsAsync = async (id, filters) => {
         const repo = new EventListRepository();
-        const returnArray = await repo.getParticipantsAsync(id);
+        const returnArray = await repo.getParticipantsAsync(id, filters);
         return returnArray;
     }
 

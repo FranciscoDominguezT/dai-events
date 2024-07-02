@@ -30,16 +30,19 @@ router.get('/:id', async (req, res) => {
 });
 
 router.get('/:id/enrollment', async (req, res) => {
-    let response;
-    const eventId = req.params.id;
-    
-    const returnArray = await svc.getParticipantsAsync(eventId);
-    if (returnArray != null) {
-      response = res.status(200).json(returnArray);
-    } else {
-      response = res.status(404).send('Evento no encontrado');
-    }
-    return response;
+  const eventId = req.params.id;
+  const { first_name, last_name, username, attended, rating } = req.query;
+  
+  try {
+      const result = await svc.getParticipantsAsync(eventId, { first_name, last_name, username, attended, rating });
+      if (result) {
+          res.status(200).json(result);
+      } else {
+          res.status(404).send('Evento no encontrado');
+      }
+  } catch (error) {
+      res.status(500).send('Error interno del servidor');
+  }
 });
 
 router.get('/', async (req, res) => {

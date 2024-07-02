@@ -150,49 +150,48 @@ export default class EventListRepository {
   };
 
   getParticipantsAsync = async (eventId, filters) => {
-    let returnObject = null;
     const client = new Client(DBConfig);
-    const { first_name, last_name, username, attended, rating } = filters || {}; // Asegurarse de que los filtros estén definidos o usar un objeto vacío
-    const conditions = [];
-    const values = [eventId];
-
-    if (first_name) {
-        values.push(`%${first_name}%`);
-        conditions.push(`u.first_name ILIKE $${values.length}`);
-    }
-    if (last_name) {
-        values.push(`%${last_name}%`);
-        conditions.push(`u.last_name ILIKE $${values.length}`);
-    }
-    if (username) {
-        values.push(`%${username}%`);
-        conditions.push(`u.username ILIKE $${values.length}`);
-    }
-    if (attended !== undefined) {
-        values.push(attended);
-        conditions.push(`e.attended = $${values.length}`);
-    }
-    if (rating) {
-        values.push(rating);
-        conditions.push(`e.rating >= $${values.length}`);
-    }
-
-    const whereClause = conditions.length ? `AND ${conditions.join(' AND ')}` : '';
+    await client.connect();
 
     try {
-        await client.connect();
+        const { first_name, last_name, username, attended, rating } = filters || {};
+        const conditions = [];
+        const values = [eventId];
+
+        if (first_name) {
+            values.push(`%${first_name}%`);
+            conditions.push(`u.first_name ILIKE $${values.length}`);
+        }
+        if (last_name) {
+            values.push(`%${last_name}%`);
+            conditions.push(`u.last_name ILIKE $${values.length}`);
+        }
+        if (username) {
+            values.push(`%${username}%`);
+            conditions.push(`u.username ILIKE $${values.length}`);
+        }
+        if (attended !== undefined) {
+            values.push(attended === 'true');
+            conditions.push(`ee.attended = $${values.length}`);
+        }
+        if (rating) {
+            values.push(parseInt(rating));
+            conditions.push(`ee.rating >= $${values.length}`);
+        }
+
+        const whereClause = conditions.length ? `AND ${conditions.join(' AND ')}` : '';
+
         const sql = `
             SELECT 
-                e.id, e.id_event, e.id_user, e.description, e.registration_date_time, e.attended, e.observations, e.rating,
-                u.id as user_id, u.first_name, u.last_name, u.username, u.password
-            FROM event_enrollments e
-            JOIN users u ON e.id_user = u.id
-            WHERE e.id_event = $1 ${whereClause}
+                ee.id, ee.id_event, ee.id_user, ee.description, ee.registration_date_time, ee.attended, ee.observations, ee.rating,
+                u.id as user_id, u.first_name, u.last_name, u.username
+            FROM event_enrollments ee
+            JOIN users u ON ee.id_user = u.id
+            WHERE ee.id_event = $1 ${whereClause}
         `;
-        const result = await client.query(sql, values);
-        await client.end();
 
-        returnObject = {
+        const result = await client.query(sql, values);
+        return {
             collection: result.rows.map(row => ({
                 id: row.id,
                 id_event: row.id_event,
@@ -201,8 +200,7 @@ export default class EventListRepository {
                     id: row.user_id,
                     first_name: row.first_name,
                     last_name: row.last_name,
-                    username: row.username,
-                    password: "******" // Ocultar el password en la respuesta
+                    username: row.username
                 },
                 description: row.description,
                 registration_date_time: row.registration_date_time,
@@ -211,16 +209,17 @@ export default class EventListRepository {
                 rating: row.rating
             })),
             pagination: {
-                limit: 0, // Este valor deberá ser actualizado según la lógica de paginación que implementes
-                offset: 0, // Este valor deberá ser actualizado según la lógica de paginación que implementes
-                nextPage: "", // Este valor deberá ser actualizado según la lógica de paginación que implementes
+                limit: 0,
+                offset: 0,
+                nextPage: "",
                 total: result.rowCount
             }
         };
     } catch (error) {
-        console.log(error);
+        console.error('Error en la consulta:', error);
+        throw error;
+    } finally {
+        await client.end();
     }
-
-    return returnObject;
 }
 }
